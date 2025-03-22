@@ -18,13 +18,12 @@ def wait_for_db():
     while not db_connection:
         try:
             engine = create_engine(DATABASE_URL)
-            
             with engine.connect() as connection:
                 db_connection = True
                 print("Database is available!")
         except OperationalError:
             print("Database is unavailable, waiting 1 second...")
             time.sleep(1)
-
 if __name__ == "__main__":
     wait_for_db()
+
