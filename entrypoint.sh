@@ -1,13 +1,11 @@
 #!/bin/bash
-set -e 
+set -e
 
 echo "Waiting for database..."
-python wait_for_db.py 
-
-echo "Database is available!/"
+python wait_for_db.py
 
 echo "Running database migrations..."
-python manage.py migrate  
+python manage.py migrate
 
 echo "Starting the bot..."
-python manage.py start  
+python manage.py start

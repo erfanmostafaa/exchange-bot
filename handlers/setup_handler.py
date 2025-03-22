@@ -22,7 +22,7 @@ def setup_user_handlers(app):
     app.add_handler(conv_handler)
 
 def setup_new_request_handlers(app):
-    app.add_handler(NewRequestHandler.get_converstion_handler())
+    app.add_handler(NewRequestHandler.get_conversation_handler())
 
 
 

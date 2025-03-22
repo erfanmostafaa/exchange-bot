@@ -6,17 +6,14 @@ import sys
 
 sys.path.append(os.getcwd())
 
-from models.user import Base as UserBase  
-from models.request import Base as RequestBase  
-
-target_metadata = [UserBase.metadata, RequestBase.metadata]
+from models.user import Base 
 
 config = context.config
-
 fileConfig(config.config_file_name)
 
-def run_migrations_offline():
+target_metadata = Base.metadata
 
+def run_migrations_offline():
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -29,7 +26,6 @@ def run_migrations_offline():
         context.run_migrations()
 
 def run_migrations_online():
-
     connectable = engine_from_config(
         config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",

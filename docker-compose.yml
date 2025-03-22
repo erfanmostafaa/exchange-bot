@@ -12,8 +12,8 @@ services:
     networks:
       - main
     volumes:
-      - .:/app 
-    command: /app/entrypoint.sh 
+      - .:/app
+    command: /app/entrypoint.sh
 
   db:
     container_name: database

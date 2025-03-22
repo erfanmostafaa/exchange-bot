@@ -3,6 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from decouple import config
 
+# خواندن متغیرهای محیطی
 POSTGRES_USER = config("POSTGRES_USER")
 POSTGRES_PASSWORD = config("POSTGRES_PASSWORD")
 POSTGRES_DB = config("POSTGRES_DB")
@@ -16,6 +17,8 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
+Base.metadata.create_all(bind=engine)
 
 def get_db():
     db = SessionLocal()
