@@ -1,7 +1,7 @@
 from telegram.ext import CommandHandler , MessageHandler , filters , ConversationHandler
 from handlers.user_handler import start, get_name, get_national_number, get_phone, cancel , GET_NAME, GET_NATIONAL_NUMBER, GET_PHONE 
 from handlers.new_request import NewRequestHandler
-
+from handlers.menu_handler import setup_menu_handlers 
 
 
 
@@ -29,3 +29,4 @@ def setup_new_request_handlers(app):
 def setup_all_handlers(app):
     setup_user_handlers(app)
     setup_new_request_handlers(app)
+    setup_menu_handlers(app)

@@ -1,11 +1,34 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup , Bot
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters, ConversationHandler, CommandHandler
 from sqlalchemy.orm import Session
 from database import get_db
-from models.user import User  # فرض می‌کنیم مدل User در فایل models/user.py تعریف شده است
+from models.user import User  
+from models.request import Request 
+from decouple import config
+
+class SendRequest:
+    @staticmethod
+    async def send_request_to_channel(request):
+        bot = Bot(token=config("TOKEN"))  
+
+        message = (
+            f"📋 **درخواست جدید**\n\n"
+            f"🔹 شماره: {request.id}\n"
+            f"🔹 نام: {request.name}\n"
+            f"🔹 ارز: {request.currency}\n"
+            f"🔹 نوع تراکنش: {request.transaction_type}\n"
+            f"🔹 قیمت پیشنهادی: {request.price}\n"
+            f"🔹 روش پرداخت: {request.payment_method}\n"
+            f"🔹 شخص/شرکت: {request.entity_type}\n"
+            f"🔹 کشور: {request.country}\n"
+            f"🔹 مقدار ارز: {request.amount}"
+        )
+
+        await bot.send_message(chat_id="@YourChannelUsername", text=message, parse_mode="MarkdownV2")
+
 
 class NewRequestHandler:
-    GET_NAME_CHOICE, GET_NEW_NAME, GET_CURRENCY, GET_TRANSACTION_TYPE, GET_PAYMENT_METHOD, GET_ENTITY_TYPE, GET_COUNTRY, GET_AMOUNT = range(8)
+    GET_NAME_CHOICE, GET_NEW_NAME, GET_CURRENCY, GET_TRANSACTION_TYPE, GET_PAYMENT_METHOD, GET_ENTITY_TYPE, GET_COUNTRY, GET_AMOUNT , GET_PRICE = range(9)
 
     @staticmethod
     async def start_new_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -109,6 +132,19 @@ class NewRequestHandler:
 
         await query.edit_message_text("لطفاً روش پرداخت را انتخاب کنید:", reply_markup=reply_markup)
         return NewRequestHandler.GET_PAYMENT_METHOD
+    
+    @staticmethod
+
+    async def get_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user_price = update.message.text
+
+
+        try : 
+            price = float(user_price)
+            context.user_data['price'] == price
+        except ValueError:
+            await update.message.reply_text("قیمت وارد شده نامعتبر است. لطفاً یک عدد وارد کنید.")
+            return NewRequestHandler.GET_PRICE
 
     @staticmethod
     async def get_payment_method(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -191,12 +227,31 @@ class NewRequestHandler:
 
         context.user_data["amount"] = query.data
 
+        db:Session=next(get_db())
+
+        request = Request(
+            user_id = update._effective_user.id , 
+            name = context.user_data['name'],
+            currency=context.user_data["currency"],
+            transaction_type=context.user_data["transaction_type"],
+            price=context.user_data["price"],
+            payment_method=context.user_data["payment_method"],
+            entity_type=context.user_data["entity_type"],
+            country=context.user_data["country"],
+            amount=context.user_data["amount"],
+        )
+
+        db.add(request)
+        db.commit()
+        await SendRequest(request)
+
         # نمایش اطلاعات نهایی
         await query.edit_message_text(
             f"✅ درخواست شما ثبت شد:\n\n"
             f"🔹 نام: {context.user_data['name']}\n"
             f"🔹 ارز: {context.user_data['currency']}\n"
             f"🔹 نوع تراکنش: {context.user_data['transaction_type']}\n"
+            f"🔹 قیمت پیشنهادی: {context.user_data['price']}\n"
             f"🔹 روش پرداخت: {context.user_data['payment_method']}\n"
             f"🔹 شخص/شرکت: {context.user_data['entity_type']}\n"
             f"🔹 کشور: {context.user_data['country']}\n"
@@ -227,6 +282,7 @@ class NewRequestHandler:
                 NewRequestHandler.GET_NEW_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_new_name)],
                 NewRequestHandler.GET_CURRENCY: [CallbackQueryHandler(NewRequestHandler.get_currency)],
                 NewRequestHandler.GET_TRANSACTION_TYPE: [CallbackQueryHandler(NewRequestHandler.get_transaction_type)],
+                NewRequestHandler.GET_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_price)],
                 NewRequestHandler.GET_PAYMENT_METHOD: [CallbackQueryHandler(NewRequestHandler.get_payment_method)],
                 NewRequestHandler.GET_ENTITY_TYPE: [CallbackQueryHandler(NewRequestHandler.get_entity_type)],
                 NewRequestHandler.GET_COUNTRY: [CallbackQueryHandler(NewRequestHandler.get_country)],
