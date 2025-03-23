@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
@@ -11,5 +12,8 @@ class User(Base):
     name = Column(String, nullable=False)
     national_number = Column(String(10), nullable=False)  
     phone = Column(String(11), nullable=False)  
+
+    requests = relationship("Request", back_populates="user")
+
     def __repr__(self):
         return f"<User(id={self.id}, user_id={self.user_id}, name={self.name})>"
