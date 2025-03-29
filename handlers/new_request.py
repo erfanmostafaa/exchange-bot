@@ -1,7 +1,12 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup , Bot
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters, ConversationHandler, CommandHandler
 from database import get_db
 from models.user import User
+from decouple import config
+import telegram
+import re
+from datetime import datetime
+import random
 
 class NewRequestHandler:
     GET_NAME_CHOICE, GET_NEW_NAME, GET_CURRENCY, GET_TRANSACTION_TYPE, GET_PAYMENT_METHOD, GET_ENTITY_TYPE, GET_COUNTRY, GET_AMOUNT, GET_PRICE = range(9)
@@ -192,6 +197,12 @@ class NewRequestHandler:
 
         await query.edit_message_text("لطفاً مقدار ارز را انتخاب کنید:", reply_markup=reply_markup)
         return NewRequestHandler.GET_AMOUNT
+    @staticmethod
+    def generate_request_id():
+        """تولید شماره درخواست منحصر به فرد"""
+        date_part = datetime.now().strftime("%y%m%d")
+        random_part = random.randint(100, 999)
+        return f"TRX-{date_part}{random_part}"
 
     @staticmethod
     async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -202,10 +213,12 @@ class NewRequestHandler:
             return await NewRequestHandler.cancel_request(update, context)
 
         context.user_data["amount"] = query.data
+        request_id = NewRequestHandler.generate_request_id()
+        context.user_data["request_id"] = request_id
 
-        # نمایش اطلاعات نهایی
-        await query.edit_message_text(
+        summary = (
             f"✅ درخواست شما ثبت شد:\n\n"
+            f"🔹 شماره درخواست: {request_id}\n"
             f"🔹 نام: {context.user_data.get('name', '')}\n"
             f"🔹 ارز: {context.user_data.get('currency', '')}\n"
             f"🔹 نوع تراکنش: {context.user_data.get('transaction_type', '')}\n"
@@ -216,6 +229,11 @@ class NewRequestHandler:
             f"🔹 مقدار ارز: {context.user_data.get('amount', '')}"
         )
 
+
+        await query.edit_message_text(summary)
+        
+        await SendRequest.send_request_to_channel(context.user_data)
+        
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -248,3 +266,32 @@ class NewRequestHandler:
             },
             fallbacks=[CommandHandler("cancel", NewRequestHandler.cancel_request)],
         )
+
+class SendRequest:
+    @staticmethod
+    def escape_markdown_v2(text):
+        """Escape special characters for Telegram MarkdownV2"""
+        escape_chars = r'\`*_{}[]()#+-.!|~>'
+        return re.sub(f"([{re.escape(escape_chars)}])", r"\\\1", str(text))
+
+    @staticmethod
+    async def send_request_to_channel(request):
+        bot = Bot(token=config("TOKEN"))
+
+        try:
+            message = (
+                f"📋 *درخواست جدید*\n\n"
+                f"🔹 *شماره:* `{request.id}`\n"
+                f"🔹 *نام:* {SendRequest.escape_markdown_v2(request.name)}\n"
+                f"🔹 *ارز:* `{request.currency}`\n"
+                f"🔹 *نوع تراکنش:* `{request.transaction_type}`\n"
+                f"🔹 *قیمت پیشنهادی:* `{request.price}`\n"
+                f"🔹 *روش پرداخت:* `{request.payment_method}`\n"
+                f"🔹 *شخص/شرکت:* `{request.entity_type}`\n"
+                f"🔹 *کشور:* `{request.country}`\n"
+                f"🔹 *مقدار ارز:* `{request.amount}`"
+            )
+
+            await bot.send_message(chat_id="@YourChannelUsername", text=message, parse_mode=telegram.constants.ParseMode.MARKDOWN_V2)
+        except Exception as e:
+            print(f"⚠️ خطا در ارسال درخواست به کانال: {e}")
