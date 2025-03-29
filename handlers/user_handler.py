@@ -54,7 +54,7 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.add(user)
 
     db.commit()
-
+    
     await update.message.reply_text(
         f"اطلاعات شما با موفقیت ثبت شد:\n\n"
         f"🟢 نام و نام خانوادگی: {name}\n"
