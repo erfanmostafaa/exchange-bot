@@ -13,6 +13,8 @@ class User(Base):
     national_number = Column(String(10), nullable=False)
     phone = Column(String(11), nullable=False)
 
+    requests = relationship("Request", back_populates="user", cascade="all, delete-orphan")
+
     def __repr__(self):
         return f"<User(id={self.id}, user_id={self.user_id}, name={self.name})>"
 
@@ -31,5 +33,6 @@ class Request(Base):
     price = Column(Float, nullable=False)  
 
     user = relationship("User", back_populates="requests")
+
     def __repr__(self):
         return f"<Request(id={self.id}, user_id={self.user_id}, currency={self.currency})>"

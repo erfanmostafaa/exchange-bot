@@ -1,8 +1,9 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup , Bot
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters, ConversationHandler, CommandHandler
 from database import get_db
-from models.user import User
+from models.user import User, Request
 from decouple import config
+from sqlalchemy.orm import Session
 import telegram
 import re
 from datetime import datetime
@@ -19,6 +20,7 @@ class NewRequestHandler:
         user = db.query(User).filter(User.user_id == user_id).first()
 
         if user:
+            context.user_data['name'] = user.name
             keyboard = [
                 [InlineKeyboardButton("تغییر نام", callback_data="change_name")],
                 [InlineKeyboardButton("انصراف", callback_data="cancel_request")],
@@ -56,6 +58,7 @@ class NewRequestHandler:
         if user:
             user.name = user_name
             db.commit()
+            context.user_data['name'] = user_name
             await update.message.reply_text(f"نام شما به {user_name} تغییر یافت.")
         else:
             await update.message.reply_text("کاربر یافت نشد.")
@@ -197,6 +200,7 @@ class NewRequestHandler:
 
         await query.edit_message_text("لطفاً مقدار ارز را انتخاب کنید:", reply_markup=reply_markup)
         return NewRequestHandler.GET_AMOUNT
+
     @staticmethod
     def generate_request_id():
         """تولید شماره درخواست منحصر به فرد"""
@@ -213,27 +217,38 @@ class NewRequestHandler:
             return await NewRequestHandler.cancel_request(update, context)
 
         context.user_data["amount"] = query.data
-        request_id = NewRequestHandler.generate_request_id()
-        context.user_data["request_id"] = request_id
 
-        summary = (
-            f"✅ درخواست شما ثبت شد:\n\n"
-            f"🔹 شماره درخواست: {request_id}\n"
-            f"🔹 نام: {context.user_data.get('name', '')}\n"
-            f"🔹 ارز: {context.user_data.get('currency', '')}\n"
-            f"🔹 نوع تراکنش: {context.user_data.get('transaction_type', '')}\n"
-            f"🔹 قیمت پیشنهادی: {context.user_data.get('price', '')}\n"
-            f"🔹 روش پرداخت: {context.user_data.get('payment_method', '')}\n"
-            f"🔹 شخص/شرکت: {context.user_data.get('entity_type', '')}\n"
-            f"🔹 کشور: {context.user_data.get('country', '')}\n"
-            f"🔹 مقدار ارز: {context.user_data.get('amount', '')}"
+        db: Session = next(get_db())
+
+        request = Request(
+            user_id=update.effective_user.id,
+            name=context.user_data['name'],
+            currency=context.user_data['currency'],
+            transaction_type=context.user_data['transaction_type'],
+            price=context.user_data["price"],
+            payment_method=context.user_data['payment_method'],
+            entity_type=context.user_data['entity_type'],
+            country=context.user_data['country'],
+            amount=context.user_data['amount']
+        )
+        db.add(request)
+        db.commit()
+        db.refresh(request)
+
+        await SendRequest.send_request_to_channel(request)
+
+        await query.edit_message_text(
+            f"درخواست شما ثبت شد\n\n"
+            f"➤ نام: {context.user_data['name']}\n"
+            f"➤ ارز: {context.user_data['currency']}\n"
+            f"➤ نوع تراکنش: {context.user_data['transaction_type']}\n"
+            f"➤ قیمت پیشنهادی: {context.user_data['price']}\n"
+            f"➤ روش پرداخت: {context.user_data['payment_method']}\n"
+            f"➤ شخص/شرکت: {context.user_data['entity_type']}\n"
+            f"➤ کشور: {context.user_data['country']}\n"
+            f"➤ مقدار ارز: {context.user_data['amount']}"
         )
 
-
-        await query.edit_message_text(summary)
-        
-        await SendRequest.send_request_to_channel(context.user_data)
-        
         context.user_data.clear()
         return ConversationHandler.END
 
@@ -267,6 +282,7 @@ class NewRequestHandler:
             fallbacks=[CommandHandler("cancel", NewRequestHandler.cancel_request)],
         )
 
+
 class SendRequest:
     @staticmethod
     def escape_markdown_v2(text):
@@ -292,6 +308,10 @@ class SendRequest:
                 f"🔹 *مقدار ارز:* `{request.amount}`"
             )
 
-            await bot.send_message(chat_id="@YourChannelUsername", text=message, parse_mode=telegram.constants.ParseMode.MARKDOWN_V2)
+            await bot.send_message(
+                chat_id=config("CHANNEL_USERNAME"),
+                text=message,
+                parse_mode=telegram.constants.ParseMode.MARKDOWN_V2
+            )
         except Exception as e:
             print(f"⚠️ خطا در ارسال درخواست به کانال: {e}")
