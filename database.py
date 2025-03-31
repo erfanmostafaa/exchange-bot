@@ -1,27 +1,21 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from decouple import config
+import os
 
-POSTGRES_USER = config("POSTGRES_USER")
-POSTGRES_PASSWORD = config("POSTGRES_PASSWORD")
-POSTGRES_DB = config("POSTGRES_DB")
-DB_HOST = config("DB_HOST", default="db")
-DB_PORT = config("DB_PORT", default="5432")
 
-DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{DB_HOST}:{DB_PORT}/{POSTGRES_DB}"
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+DB_HOST = os.getenv("DB_HOST", default="db")
+DB_PORT = os.getenv("DB_PORT", default="5432")
 
-engine = create_engine(DATABASE_URL)
+database_url = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{DB_HOST}:{DB_PORT}/{POSTGRES_DB}"
+if database_url:
+    engine = create_engine(database_url, echo=True)
 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-Base.metadata.create_all(bind=engine)
 
 def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    Session = sessionmaker(bind=engine)
+    with Session() as session:
+        yield session
