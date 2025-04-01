@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy import DateTime
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -31,7 +33,8 @@ class Request(Base):
     country = Column(String, nullable=False)
     amount = Column(Integer, nullable=False)  
     price = Column(Float, nullable=False)  
-
+    request_id = Column(String, unique=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
     user = relationship("User", back_populates="requests")
 
     def __repr__(self):
