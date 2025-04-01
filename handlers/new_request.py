@@ -15,7 +15,7 @@ class NewRequestHandler:
     # Conversation states
     GET_NAME_CHOICE, GET_NEW_NAME, GET_CURRENCY, GET_COUNTRY, \
     GET_TRANSACTION_TYPE, GET_PAYMENT_METHOD, GET_PRICE, \
-    GET_ENTITY_TYPE, GET_AMOUNT = range(9)
+    GET_ENTITY_TYPE, GET_AMOUNT, CONFIRM = range(10)
 
     # Currency options
     CURRENCIES = [
@@ -87,15 +87,15 @@ class NewRequestHandler:
         """Handle name choice selection"""
         choice = update.message.text
 
+        if choice == "انصراف":
+            return await NewRequestHandler.cancel_request(update, context)
+        
         if choice == "تغییر نام":
             await update.message.reply_text(
                 "✏️ لطفاً نام جدید خود را وارد کنید:",
                 reply_markup=ReplyKeyboardRemove()
             )
             return NewRequestHandler.GET_NEW_NAME
-        
-        if choice == "انصراف":
-            return await NewRequestHandler.cancel_request(update, context)
         
         return await NewRequestHandler.show_currency_menu(update, context)
 
@@ -249,9 +249,10 @@ class NewRequestHandler:
             reply_markup=reply_markup
         )
         return NewRequestHandler.GET_AMOUNT
+
     @staticmethod
     async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle amount input"""
+        """Handle amount input and calculate final amount"""
         try:
             amount_text = update.message.text
 
@@ -270,8 +271,52 @@ class NewRequestHandler:
                 await update.message.reply_text("❌ مقدار باید بزرگتر از صفر باشد")
                 return NewRequestHandler.GET_AMOUNT
 
-            context.user_data["amount"] = amount
+            # محاسبه مبلغ نهایی با کسر کارمزد
+            price = context.user_data.get("price", 0.0)
+            total = amount * price
+            
+            if amount < 500:
+                fee_percent = 2.5  # 2.5% برای مقادیر کمتر از 500
+            else:
+                fee_percent = 0.5  # 0.5% برای مقادیر 500 و بیشتر
+                
+            fee = total * fee_percent / 100
+            final_amount = total - fee
 
+            context.user_data["amount"] = amount
+            context.user_data["final_amount"] = final_amount
+            context.user_data["fee"] = fee
+
+            # نمایش محاسبات به کاربر قبل از تأیید نهایی
+            keyboard = [["تأیید و ثبت", "انصراف"]]
+            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            
+            await update.message.reply_text(
+                f"🧮 محاسبات:\n\n"
+                f"🔢 مقدار ارز: {amount:,}\n"
+                f"💰 قیمت واحد: {price:,}\n"
+                f"💵 مبلغ کل: {total:,.0f}\n"
+                f"📉 کارمزد ({fee_percent}%): {fee:,.0f}\n"
+                f"✅ مبلغ نهایی: {final_amount:,.0f}\n\n"
+                f"آیا مایل به ثبت درخواست هستید؟",
+                reply_markup=reply_markup
+            )
+            
+            return NewRequestHandler.CONFIRM
+
+        except ValueError:
+            await update.message.reply_text("❌ مقدار وارد شده نامعتبر است. لطفاً یک عدد صحیح مثبت وارد کنید:")
+            return NewRequestHandler.GET_AMOUNT
+
+    @staticmethod
+    async def confirm_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle final confirmation"""
+        user_choice = update.message.text
+        
+        if user_choice == "انصراف":
+            return await NewRequestHandler.cancel_request(update, context)
+        
+        if user_choice == "تأیید و ثبت":
             db: Session = next(get_db())
             
             try:
@@ -282,7 +327,7 @@ class NewRequestHandler:
                     payment_method=context.user_data.get('payment_method', ''),
                     entity_type=context.user_data.get('entity_type', ''),
                     country=context.user_data.get('country', ''),
-                    amount=amount,
+                    amount=context.user_data.get('amount', 0),
                     price=context.user_data.get("price", 0.0),
                     created_at=datetime.now(),
                     request_id=NewRequestHandler.generate_request_id()
@@ -292,43 +337,41 @@ class NewRequestHandler:
                 db.commit()
                 
                 user = db.query(User).filter(User.user_id == context.user_data['user_id']).first()
-                if not user:
-                    raise Exception("User not found")
-                
                 success = await SendRequest.send_request_to_channel(request, user.name)
                 
-                if not success:
-                    raise Exception("Failed to send to channel")
-
-                await update.message.reply_text(
-                    f"✅ درخواست شما با موفقیت ثبت شد:\n\n"
-                    f"📌 شماره درخواست: {request.request_id}\n"
-                    f"👤 نام: {user.name}\n"
-                    f"💰 ارز: {context.user_data['currency']}\n"
-                    f"🌍 کشور: {context.user_data['country']}\n"
-                    f"💲 قیمت: {context.user_data['price']:,}\n"
-                    f"🔢 مقدار: {amount:,}\n"
-                    f"🔄 نوع تراکنش: {context.user_data['transaction_type']}\n"
-                    f"💳 روش پرداخت: {context.user_data['payment_method']}\n"
-                    f"🏢 نوع: {context.user_data['entity_type']}",
-                    reply_markup=ReplyKeyboardMarkup([["بازگشت به منوی اصلی"]], resize_keyboard=True)
-                )
+                if success:
+                    final_amount = context.user_data.get('final_amount', 0)
+                    fee = context.user_data.get('fee', 0)
+                    
+                    await update.message.reply_text(
+                        f"✅ درخواست شما با موفقیت ثبت شد:\n\n"
+                        f"📌 شماره درخواست: {request.request_id}\n"
+                        f"👤 نام: {user.name}\n"
+                        f"💰 ارز: {context.user_data['currency']}\n"
+                        f"🌍 کشور: {context.user_data['country']}\n"
+                        f"💲 قیمت واحد: {context.user_data['price']:,}\n"
+                        f"🔢 مقدار: {context.user_data['amount']:,}\n"
+                        f"💵 مبلغ کل: {context.user_data['amount'] * context.user_data['price']:,.0f}\n"
+                        f"📉 کارمزد: {fee:,.0f}\n"
+                        f"✅ مبلغ نهایی: {final_amount:,.0f}\n"
+                        f"🔄 نوع تراکنش: {context.user_data['transaction_type']}\n"
+                        f"💳 روش پرداخت: {context.user_data['payment_method']}\n"
+                        f"🏢 نوع: {context.user_data['entity_type']}",
+                        reply_markup=ReplyKeyboardMarkup([["بازگشت به منوی اصلی"]], resize_keyboard=True)
+                    )
+                else:
+                    raise Exception("Failed to send request to channel")
 
             except Exception as e:
                 db.rollback()
-                print(f"Error in get_amount: {str(e)}")
+                print(f"Error in confirm_request: {e}")
                 await update.message.reply_text(
-                    f"❌ خطا در ثبت درخواست: {str(e)}\nلطفاً مجدداً تلاش کنید.",
+                    "❌ خطا در ثبت درخواست! لطفاً مجدداً تلاش کنید.",
                     reply_markup=ReplyKeyboardMarkup([["بازگشت به منوی اصلی"]], resize_keyboard=True)
                 )
-                
-        except ValueError:
-            await update.message.reply_text("❌ مقدار وارد شده نامعتبر است. لطفاً یک عدد صحیح مثبت وارد کنید:")
-            return NewRequestHandler.GET_AMOUNT
-            
-        finally:
-            context.user_data.clear()
-            return ConversationHandler.END
+            finally:
+                context.user_data.clear()
+                return ConversationHandler.END
 
     @staticmethod
     async def cancel_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -337,8 +380,8 @@ class NewRequestHandler:
             "❌ عملیات لغو شد. به منوی اصلی بازگشتید.",
             reply_markup=ReplyKeyboardRemove()
         )
-        await show_main_menu(update, context)
         context.user_data.clear()
+        await show_main_menu(update, context)
         return ConversationHandler.END
 
     @staticmethod
@@ -356,6 +399,7 @@ class NewRequestHandler:
                 NewRequestHandler.GET_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_price)],
                 NewRequestHandler.GET_ENTITY_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_entity_type)],
                 NewRequestHandler.GET_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_amount)],
+                NewRequestHandler.CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.confirm_request)],
             },
             fallbacks=[
                 CommandHandler("cancel", NewRequestHandler.cancel_request),
@@ -367,13 +411,17 @@ class NewRequestHandler:
 
 class SendRequest:
     @staticmethod
+    def escape_markdown_v2(text):
+        """Escape special characters for Telegram markdown"""
+        escape_chars = r'\`*_{}[]()#+-.!|~>'
+        return re.sub(f"([{re.escape(escape_chars)}])", r"\\\1", str(text))
+
+    @staticmethod
     async def send_request_to_channel(request, user_name):
         """Send request to Telegram channel"""
         try:
             bot = Bot(token=config("TOKEN"))
             channel_id = config("CHANNEL_USERNAME")
-            
-            print(f"Attempting to send to channel: {channel_id}")  # Debug log
 
             message = (
                 f"📋 *درخواست جدید*\n\n"
@@ -384,8 +432,8 @@ class SendRequest:
                 f"➖➖➖➖➖➖\n"
                 f"🔸 *نوع تراکنش:* `{request.transaction_type}`\n"
                 f"🔸 *قیمت:* `{request.price:,}`\n"
-                f"🔸 *روش پرداخت:* `{request.payment_method}`\n"
-                f"🔸 *مقدار:* `{request.amount}`"
+                f"🔸 *مقدار:* `{request.amount}`\n"
+                f"🔸 *روش پرداخت:* `{request.payment_method}`"
             )
 
             await bot.send_message(
@@ -396,11 +444,4 @@ class SendRequest:
             return True
         except Exception as e:
             print(f"⚠️ خطا در ارسال به کانال: {str(e)}")
-            # بررسی نوع خطا
-            if "Chat not found" in str(e):
-                print("⚠️ کانال یافت نشد. مطمئن شوید CHANNEL_USERNAME صحیح است")
-            elif "Forbidden" in str(e):
-                print("⚠️ ربات به کانال دسترسی ندارد. مطمئن شوید ربات admin است")
-            elif "Unauthorized" in str(e):
-                print("⚠️ توکن ربات نامعتبر است")
             return False
