@@ -55,18 +55,19 @@ async def get_national_number(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     context.user_data["national_number"] = national_number
     await update.message.reply_text(
-        "لطفاً شماره تلفن همراه خود را وارد کنید (مثال: 09123456789):",
+        "لطفاً شماره تلفن خود را دقیقاً همانطور که در تلگرام ثبت کرده‌اید وارد کنید:",
         reply_markup=ReplyKeyboardRemove()
     )
     return GET_PHONE
 
 async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Get user's phone number"""
+    """Get user's phone number (exactly as in Telegram)"""
     phone_number = update.message.text.strip()
     
-    if not (phone_number.startswith('09') and len(phone_number) == 11 and phone_number.isdigit()):
+    # حداقل اعتبارسنجی
+    if not phone_number or len(phone_number) < 5:
         await update.message.reply_text(
-            "❌ شماره تلفن نامعتبر است. لطفاً شماره تلفن 11 رقمی شروع با 09 وارد کنید:",
+            "❌ شماره تلفن نامعتبر است. لطفاً شماره تلفن خود را دقیقاً همانطور که در تلگرام ثبت کرده‌اید وارد کنید:",
             reply_markup=ReplyKeyboardRemove()
         )
         return GET_PHONE
@@ -78,6 +79,14 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db: Session = next(get_db())
 
     try:
+        # بررسی تکراری نبودن شماره
+        if db.query(User).filter(User.phone == phone_number).first():
+            await update.message.reply_text(
+                "❌ این شماره تلفن قبلاً ثبت شده است.",
+                reply_markup=ReplyKeyboardMarkup([["بازگشت به منوی اصلی"]], resize_keyboard=True)
+            )
+            return ConversationHandler.END
+
         user = User(
             user_id=user_id,
             name=name,
@@ -88,7 +97,7 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         db.commit()
         
         await update.message.reply_text(
-            f"✅ اطلاعات شما با موفقیت ثبت شد:\n\n"
+            f"✅ ثبت‌نام با موفقیت انجام شد!\n\n"
             f"👤 نام: {name}\n"
             f"🆔 شماره ملی: {national_number}\n"
             f"📱 تلفن: {phone_number}",
@@ -97,7 +106,6 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     except Exception as e:
         db.rollback()
-        print(f"Error in get_phone: {e}")
         await update.message.reply_text(
             "❌ خطا در ثبت اطلاعات! لطفاً مجدداً تلاش کنید.",
             reply_markup=ReplyKeyboardMarkup([["بازگشت به منوی اصلی"]], resize_keyboard=True)
@@ -137,11 +145,10 @@ async def change_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         else:
             await update.message.reply_text(
-                "❌ کاربر یافت نشد! لطفاً ابتدا با دستور /start ثبت‌نام کنید.",
+                "❌ کاربر یافت نشد! لطفاً ابتدا ثبت‌نام کنید.",
                 reply_markup=ReplyKeyboardMarkup([["بازگشت به منوی اصلی"]], resize_keyboard=True)
             )
-    except Exception as e:
-        print(f"Error in change_name: {e}")
+    except():
         await update.message.reply_text(
             "❌ خطا در تغییر نام! لطفاً مجدداً تلاش کنید.",
             reply_markup=ReplyKeyboardMarkup([["بازگشت به منوی اصلی"]], resize_keyboard=True)

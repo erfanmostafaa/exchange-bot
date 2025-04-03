@@ -13,8 +13,7 @@ class User(Base):
     user_id = Column(Integer, unique=True, nullable=False)
     name = Column(String, nullable=False)
     national_number = Column(String(10), nullable=False)
-    phone = Column(String(11), nullable=False)
-
+    phone = Column(String(20), nullable=True)
     requests = relationship("Request", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
