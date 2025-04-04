@@ -10,7 +10,7 @@ import asyncio
 
 from database import get_db
 from models.user import User, Request
-from handlers.menu_handler import show_main_menu
+from handlers.menu import show_main_menu
 
 class NewRequestHandler:
     # حالت‌های مکالمه
@@ -47,12 +47,12 @@ class NewRequestHandler:
         ["استرالیا", "ایران", "❌ انصراف"]
     ]
 
-    @staticmethod
-    def generate_request_id():
-        """تولید شناسه منحصر به فرد برای درخواست"""
-        date_part = datetime.now().strftime("%y%m%d")
-        random_part = random.randint(100, 999)
-        return f"TRX-{date_part}{random_part}"
+    # @staticmethod
+    # def generate_request_id():
+    #     """تولید شناسه منحصر به فرد برای درخواست"""
+    #     date_part = datetime.now().strftime("%y%m%d")
+    #     random_part = random.randint(100, 999)
+    #     return f"TRX-{date_part}{random_part}"
 
     @staticmethod
     async def start_new_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -106,8 +106,6 @@ class NewRequestHandler:
     @staticmethod
     async def get_new_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """دریافت نام جدید از کاربر"""
-        if update.message.text == "❌ انصراف":
-            return await NewRequestHandler.clean_cancel(update, context)
 
         new_name = update.message.text.strip()
         if len(new_name) < 3:
@@ -311,7 +309,6 @@ class NewRequestHandler:
         
         if update.message.text == "✅ تأیید و ثبت":
             db: Session = next(get_db())
-            
             try:
                 request = Request(
                     user_id=context.user_data['user_id'],
@@ -322,20 +319,19 @@ class NewRequestHandler:
                     country=context.user_data['country'],
                     amount=context.user_data['amount'],
                     price=context.user_data['price'],
-                    created_at=datetime.now(),
-                    request_id=NewRequestHandler.generate_request_id()
                 )
                 
                 db.add(request)
                 db.commit()
                 
                 user = db.query(User).filter(User.user_id == context.user_data['user_id']).first()
-                success = await SendRequest.send_request_to_channel(request, user.name)
+                # success = await SendRequest.send_request_to_channel(request, user.name)
+                success = True
                 
                 if success:
                     await update.message.reply_text(
                         f"✅ درخواست شما با موفقیت ثبت شد:\n\n"
-                        f"📌 شماره درخواست: {request.request_id}\n"
+                        f"📌 شماره درخواست: {request.id}\n"
                         f"👤 نام: {user.name}\n"
                         f"💰 ارز: {context.user_data['currency']}\n"
                         f"🌍 کشور: {context.user_data['country']}\n"
@@ -390,7 +386,7 @@ class NewRequestHandler:
             entry_points=[MessageHandler(filters.Regex("^📝 ثبت درخواست جدید$"), NewRequestHandler.start_new_request)],
             states={
                 NewRequestHandler.GET_NAME_CHOICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.handle_name_choice)],
-                NewRequestHandler.GET_NEW_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_new_name)],
+                # NewRequestHandler.GET_NEW_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_new_name)],
                 NewRequestHandler.GET_CURRENCY: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_currency)],
                 NewRequestHandler.GET_COUNTRY: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_country)],
                 NewRequestHandler.GET_TRANSACTION_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_transaction_type)],

@@ -12,6 +12,7 @@ from database import get_db
 from models.user import Request, User
 from datetime import datetime, timedelta
 
+
 # Conversation states
 SELECT_TYPE, SHOW_DETAILS = range(2)
 

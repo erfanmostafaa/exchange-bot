@@ -1,13 +1,14 @@
 from telegram.ext import Application
 from decouple import config
-from handlers.setup_handler import setup_all_handlers
+from handlers.setup import setup_all_handlers
 
-def main():
-    app = Application.builder().token(config("TOKEN")).build()
 
-    setup_all_handlers(app)
+# Set up the bot application
+app = Application.builder().token(config("TOKEN")).build()
 
-    app.run_polling()
+# Register the commands
+setup_all_handlers(app)
 
-if __name__ == "__main__":
-    main()
+# Start the bot
+app.run_polling()
+

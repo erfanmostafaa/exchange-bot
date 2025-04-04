@@ -2,7 +2,8 @@ from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, filters, CommandHandler
 from sqlalchemy.orm import Session
 from database import get_db
-from models.user import User
+from models.user import Request, User
+from datetime import datetime, timedelta
 
 # حالت‌های گفتگو
 GET_NAME, GET_NATIONAL_NUMBER, GET_PHONE, CHANGE_NAME = range(4)
@@ -116,10 +117,7 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def change_name_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Start name change process"""
-    await update.message.reply_text(
-        "✏️ لطفاً نام جدید خود را وارد کنید:",
-        reply_markup=ReplyKeyboardRemove()
-    )
+    await update.message.reply_text("✏️ لطفاً نام جدید خود را وارد کنید:")
     return CHANGE_NAME
 
 async def change_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
