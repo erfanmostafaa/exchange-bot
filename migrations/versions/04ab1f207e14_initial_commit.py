@@ -40,9 +40,11 @@ def upgrade() -> None:
     sa.Column('country', sa.String(), nullable=False),
     sa.Column('amount', sa.Integer(), nullable=False),
     sa.Column('price', sa.Float(), nullable=False),
+    sa.Column('request_id', sa.String(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=True),
     sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('request_id')
     )
     # ### end Alembic commands ###
 

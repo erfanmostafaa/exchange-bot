@@ -32,6 +32,7 @@ class Request(Base):
     country = Column(String, nullable=False)
     amount = Column(Integer, nullable=False)  
     price = Column(Float, nullable=False)  
+    request_id = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.now)
     user = relationship("User", back_populates="requests")
 

@@ -47,12 +47,12 @@ class NewRequestHandler:
         ["استرالیا", "ایران", "❌ انصراف"]
     ]
 
-    # @staticmethod
-    # def generate_request_id():
-    #     """تولید شناسه منحصر به فرد برای درخواست"""
-    #     date_part = datetime.now().strftime("%y%m%d")
-    #     random_part = random.randint(100, 999)
-    #     return f"TRX-{date_part}{random_part}"
+    @staticmethod
+    def generate_request_id():
+        """تولید شناسه منحصر به فرد برای درخواست"""
+        date_part = datetime.now().strftime("%y%m%d")
+        random_part = random.randint(100, 999)
+        return f"TRX-{date_part}{random_part}"
 
     @staticmethod
     async def start_new_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -319,6 +319,7 @@ class NewRequestHandler:
                     country=context.user_data['country'],
                     amount=context.user_data['amount'],
                     price=context.user_data['price'],
+                    request_id = NewRequestHandler.generate_request_id()
                 )
                 
                 db.add(request)
@@ -331,7 +332,7 @@ class NewRequestHandler:
                 if success:
                     await update.message.reply_text(
                         f"✅ درخواست شما با موفقیت ثبت شد:\n\n"
-                        f"📌 شماره درخواست: {request.id}\n"
+                        f"📌 شماره درخواست: {request.request_id}\n"
                         f"👤 نام: {user.name}\n"
                         f"💰 ارز: {context.user_data['currency']}\n"
                         f"🌍 کشور: {context.user_data['country']}\n"
