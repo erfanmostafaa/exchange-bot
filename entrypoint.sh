@@ -2,7 +2,7 @@
 set -e
 
 echo "Waiting for database..."
-python wait_for_db.py
+python database.py
 
 # migrate 
 echo "applying migrations .."

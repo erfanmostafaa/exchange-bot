@@ -1,6 +1,7 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import create_engine, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
+import time
 import os
 
 
@@ -19,3 +20,20 @@ def get_db():
     Session = sessionmaker(bind=engine)
     with Session() as session:
         yield session
+
+def wait_for_db():
+    db_connection = False
+    while not db_connection:
+        try:
+            engine = create_engine(database_url)
+            with engine.connect() as connection:
+                connection.execute(select(1)).scalar_one() 
+            db_connection = True
+            print("Database is available!")
+        except OperationalError:
+            print("Database is unavailable, waiting 1 second...")
+            time.sleep(1)
+
+
+if __name__ == "__main__":
+    wait_for_db()
