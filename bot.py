@@ -2,7 +2,8 @@ from telegram.ext import Application
 from decouple import config
 from telegram.ext import CommandHandler, MessageHandler, filters
 from conversations.register_remittance import RegisterRemittanceConversation 
-from handlers.user import get_user_conversation_handler, get_change_name_handler
+from conversations.register_user import RegisterUserConversation
+from conversations.change_name import ChangeNameConvarsation
 from conversations.list_remittance import ListRemittanceConversation
 from handlers.menu import show_main_menu, user_info_handler, support_handler, exchange_conditions
 
@@ -12,11 +13,13 @@ app = Application.builder().token(config("TOKEN")).build()
 
 list_remittance = ListRemittanceConversation()
 register_remittance = RegisterRemittanceConversation()
+register_user = RegisterUserConversation()
+change_name = ChangeNameConvarsation()
 
 
 """Register all user-related handlers"""
-app.add_handler(get_user_conversation_handler())
-app.add_handler(get_change_name_handler())
+app.add_handler(register_user.get_user_conversation_handler())
+app.add_handler(change_name.get_change_name_handler())
 
 
 """Register all menu handlers"""
