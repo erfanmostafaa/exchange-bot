@@ -2,8 +2,7 @@ from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, filters, CommandHandler
 from sqlalchemy.orm import Session
 from database import get_db
-from models.user import Request, User
-from datetime import datetime, timedelta
+from models.tables import User
 
 # حالت‌های گفتگو
 GET_NAME, GET_NATIONAL_NUMBER, GET_PHONE, CHANGE_NAME = range(4)
@@ -81,7 +80,7 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         # بررسی تکراری نبودن شماره
-        if db.query(User).filter(User.phone == phone_number).first():
+        if db.query(User).filter(User.phone_number == phone_number).first():
             await update.message.reply_text(
                 "❌ این شماره تلفن قبلاً ثبت شده است.",
                 reply_markup=ReplyKeyboardMarkup([["بازگشت به منوی اصلی"]], resize_keyboard=True)
@@ -92,7 +91,7 @@ async def get_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_id=user_id,
             name=name,
             national_number=national_number,
-            phone=phone_number
+            phone_number=phone_number
         )
         db.add(user)
         db.commit()

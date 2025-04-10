@@ -13,15 +13,14 @@ class User(Base):
     user_id = Column(Integer, unique=True, nullable=False)
     name = Column(String, nullable=False)
     national_number = Column(String(10), nullable=False)
-    phone = Column(String(20), nullable=True)
-    requests = relationship("Request", back_populates="user", cascade="all, delete-orphan")
+    phone_number = Column(String(20), nullable=True)
 
     def __repr__(self):
         return f"<User(id={self.id}, user_id={self.user_id}, name={self.name})>"
 
 
-class Request(Base):
-    __tablename__ = 'requests'
+class Remittance(Base):
+    __tablename__ = 'remittance'
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False) 
@@ -32,9 +31,8 @@ class Request(Base):
     country = Column(String, nullable=False)
     amount = Column(Integer, nullable=False)  
     price = Column(Float, nullable=False)  
-    request_id = Column(String, nullable=False, unique=True)
+    remittance_id = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.now)
-    user = relationship("User", back_populates="requests")
 
     def __repr__(self):
-        return f"<Request(id={self.id}, user_id={self.user_id}, currency={self.currency})>"
+        return f"<Remittance(id={self.id}, user_id={self.user_id}, currency={self.currency})>"

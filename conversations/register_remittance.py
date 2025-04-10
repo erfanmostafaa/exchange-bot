@@ -4,15 +4,13 @@ from sqlalchemy.orm import Session
 import re
 from decouple import config
 import telegram
-from datetime import datetime, timedelta
+from datetime import datetime
 import random
-import asyncio
-
 from database import get_db
-from models.user import User, Request
+from models.tables import User, Remittance
 from handlers.menu import show_main_menu
 
-class NewRequestHandler:
+class RegisterRemittanceConversation:
     # حالت‌های مکالمه
     (
         GET_NAME_CHOICE, GET_NEW_NAME, GET_CURRENCY, GET_COUNTRY,
@@ -40,6 +38,7 @@ class NewRequestHandler:
         ["ایران", "❌ انصراف"]
     ]
 
+
     OTHER_COUNTRIES = [
         ["آمریکا", "انگلیس", "کانادا"],
         ["ترکیه", "امارات", "سوئیس"],
@@ -47,19 +46,19 @@ class NewRequestHandler:
         ["استرالیا", "ایران", "❌ انصراف"]
     ]
 
-    @staticmethod
-    def generate_request_id():
+
+    def generate_remittance_id(self):
         """تولید شناسه منحصر به فرد برای درخواست"""
         date_part = datetime.now().strftime("%y%m%d")
         random_part = random.randint(100, 999)
         return f"TRX-{date_part}{random_part}"
 
-    @staticmethod
-    async def start_new_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def start_new_remittance(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """شروع فرآیند ثبت درخواست جدید"""
         # پاکسازی کامل داده‌های قبلی
         context.user_data.clear()
-        context.user_data['conversation'] = 'new_request'
+        context.user_data['conversation'] = 'new_remittance'
         
         user_id = update.effective_user.id
         db = next(get_db())
@@ -84,33 +83,33 @@ class NewRequestHandler:
             f"👋 سلام {user.name}!\nبرای شروع ثبت درخواست جدید لطفاً انتخاب کنید:",
             reply_markup=reply_markup
         )
-        return NewRequestHandler.GET_NAME_CHOICE
+        return self.GET_NAME_CHOICE
 
-    @staticmethod
-    async def handle_name_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def handle_name_choice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """مدیریت انتخاب نام کاربر"""
         choice = update.message.text
 
         if choice == "❌ انصراف":
-            return await NewRequestHandler.clean_cancel(update, context)
+            return await self.clean_cancel(update, context)
         
         if choice == "تغییر نام":
             await update.message.reply_text(
                 "✏️ لطفاً نام جدید خود را وارد کنید:",
                 reply_markup=ReplyKeyboardRemove()
             )
-            return NewRequestHandler.GET_NEW_NAME
+            return self.GET_NEW_NAME
         
-        return await NewRequestHandler.show_currency_menu(update, context)
+        return await self.show_currency_menu(update, context)
 
-    @staticmethod
-    async def get_new_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def get_new_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """دریافت نام جدید از کاربر"""
 
         new_name = update.message.text.strip()
         if len(new_name) < 3:
             await update.message.reply_text("❌ نام باید حداقل ۳ کاراکتر باشد. لطفاً مجدداً وارد کنید:")
-            return NewRequestHandler.GET_NEW_NAME
+            return self.GET_NEW_NAME
 
         user_id = context.user_data['user_id']
         db = next(get_db())
@@ -121,42 +120,42 @@ class NewRequestHandler:
             db.commit()
             await update.message.reply_text(f"✅ نام شما به {new_name} تغییر یافت.")
 
-        return await NewRequestHandler.show_currency_menu(update, context)
+        return await self.show_currency_menu(update, context)
 
-    @staticmethod
-    async def show_currency_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def show_currency_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """نمایش منوی انتخاب ارز"""
-        reply_markup = ReplyKeyboardMarkup(NewRequestHandler.CURRENCIES, resize_keyboard=True)
+        reply_markup = ReplyKeyboardMarkup(self.CURRENCIES, resize_keyboard=True)
         await update.message.reply_text(
             "💰 لطفاً نوع ارز را انتخاب کنید:",
             reply_markup=reply_markup
         )
-        return NewRequestHandler.GET_CURRENCY
+        return self.GET_CURRENCY
 
-    @staticmethod
-    async def get_currency(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def get_currency(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """مدیریت انتخاب ارز"""
         if update.message.text == "❌ انصراف":
-            return await NewRequestHandler.clean_cancel(update, context)
+            return await self.clean_cancel(update, context)
 
         context.user_data["currency"] = update.message.text
 
         if "یورو" in update.message.text:
-            reply_markup = ReplyKeyboardMarkup(NewRequestHandler.EURO_COUNTRIES, resize_keyboard=True)
+            reply_markup = ReplyKeyboardMarkup(self.EURO_COUNTRIES, resize_keyboard=True)
         else:
-            reply_markup = ReplyKeyboardMarkup(NewRequestHandler.OTHER_COUNTRIES, resize_keyboard=True)
+            reply_markup = ReplyKeyboardMarkup(self.OTHER_COUNTRIES, resize_keyboard=True)
 
         await update.message.reply_text(
             "🌍 لطفاً کشور مورد نظر را انتخاب کنید:",
             reply_markup=reply_markup
         )
-        return NewRequestHandler.GET_COUNTRY
+        return self.GET_COUNTRY
 
-    @staticmethod
-    async def get_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def get_country(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """مدیریت انتخاب کشور"""
         if update.message.text == "❌ انصراف":
-            return await NewRequestHandler.clean_cancel(update, context)
+            return await self.clean_cancel(update, context)
 
         context.user_data["country"] = update.message.text
 
@@ -167,13 +166,13 @@ class NewRequestHandler:
             "💱 لطفاً نوع تراکنش را انتخاب کنید:",
             reply_markup=reply_markup
         )
-        return NewRequestHandler.GET_TRANSACTION_TYPE
+        return self.GET_TRANSACTION_TYPE
 
-    @staticmethod
-    async def get_transaction_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def get_transaction_type(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """مدیریت انتخاب نوع تراکنش"""
         if update.message.text == "❌ انصراف":
-            return await NewRequestHandler.clean_cancel(update, context)
+            return await self.clean_cancel(update, context)
 
         context.user_data["transaction_type"] = update.message.text
 
@@ -187,13 +186,13 @@ class NewRequestHandler:
             "💳 لطفاً روش پرداخت را انتخاب کنید:",
             reply_markup=reply_markup
         )
-        return NewRequestHandler.GET_PAYMENT_METHOD
+        return self.GET_PAYMENT_METHOD
 
-    @staticmethod
-    async def get_payment_method(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def get_payment_method(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """مدیریت انتخاب روش پرداخت"""
         if update.message.text == "❌ انصراف":
-            return await NewRequestHandler.clean_cancel(update, context)
+            return await self.clean_cancel(update, context)
 
         context.user_data["payment_method"] = update.message.text
 
@@ -201,13 +200,13 @@ class NewRequestHandler:
             "💰 لطفاً قیمت پیشنهادی خود را وارد کنید:",
             reply_markup=ReplyKeyboardRemove()
         )
-        return NewRequestHandler.GET_PRICE
+        return self.GET_PRICE
 
-    @staticmethod
-    async def get_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def get_price(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """مدیریت ورود قیمت"""
         if update.message.text == "❌ انصراف":
-            return await NewRequestHandler.clean_cancel(update, context)
+            return await self.clean_cancel(update, context)
 
         try:
             price = float(update.message.text.replace(",", ""))
@@ -216,7 +215,7 @@ class NewRequestHandler:
             context.user_data["price"] = price
         except ValueError:
             await update.message.reply_text("❌ قیمت وارد شده نامعتبر است. لطفاً یک عدد مثبت وارد کنید:")
-            return NewRequestHandler.GET_PRICE
+            return self.GET_PRICE
 
         keyboard = [["شخص", "شرکت"], ["❌ انصراف"]]
         reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
@@ -225,13 +224,13 @@ class NewRequestHandler:
             "👤 لطفاً نوع شخص/شرکت را انتخاب کنید:",
             reply_markup=reply_markup
         )
-        return NewRequestHandler.GET_ENTITY_TYPE
+        return self.GET_ENTITY_TYPE
 
-    @staticmethod
-    async def get_entity_type(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def get_entity_type(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """مدیریت انتخاب نوع شخص/شرکت"""
         if update.message.text == "❌ انصراف":
-            return await NewRequestHandler.clean_cancel(update, context)
+            return await self.clean_cancel(update, context)
 
         context.user_data["entity_type"] = update.message.text
 
@@ -246,13 +245,13 @@ class NewRequestHandler:
             "🔢 لطفاً مقدار ارز را انتخاب کنید:",
             reply_markup=reply_markup
         )
-        return NewRequestHandler.GET_AMOUNT
+        return self.GET_AMOUNT
 
-    @staticmethod
-    async def get_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def get_amount(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """مدیریت ورود مقدار و محاسبه نهایی"""
         if update.message.text == "❌ انصراف":
-            return await NewRequestHandler.clean_cancel(update, context)
+            return await self.clean_cancel(update, context)
 
         try:
             if update.message.text == "سایر مقادیر":
@@ -260,12 +259,12 @@ class NewRequestHandler:
                     "لطفاً مقدار مورد نظر خود را به عدد وارد کنید:",
                     reply_markup=ReplyKeyboardRemove()
                 )
-                return NewRequestHandler.GET_AMOUNT
+                return self.GET_AMOUNT
 
             amount = int(update.message.text.replace(",", ""))
             if amount <= 0:
                 await update.message.reply_text("❌ مقدار باید بزرگتر از صفر باشد")
-                return NewRequestHandler.GET_AMOUNT
+                return self.GET_AMOUNT
 
             price = context.user_data.get("price", 0.0)
             total = amount * price
@@ -295,22 +294,22 @@ class NewRequestHandler:
                 reply_markup=reply_markup
             )
             
-            return NewRequestHandler.CONFIRM_REQUEST
+            return self.CONFIRM_REQUEST
 
         except ValueError:
             await update.message.reply_text("❌ مقدار وارد شده نامعتبر است. لطفاً یک عدد صحیح مثبت وارد کنید:")
-            return NewRequestHandler.GET_AMOUNT
+            return self.GET_AMOUNT
 
-    @staticmethod
-    async def confirm_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def confirm_request(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """مدیریت تأیید نهایی درخواست"""
         if update.message.text == "❌ انصراف":
-            return await NewRequestHandler.clean_cancel(update, context)
+            return await self.clean_cancel(update, context)
         
         if update.message.text == "✅ تأیید و ثبت":
             db: Session = next(get_db())
             try:
-                request = Request(
+                remittance = Remittance(
                     user_id=context.user_data['user_id'],
                     currency=context.user_data['currency'],
                     transaction_type=context.user_data['transaction_type'],
@@ -319,20 +318,19 @@ class NewRequestHandler:
                     country=context.user_data['country'],
                     amount=context.user_data['amount'],
                     price=context.user_data['price'],
-                    request_id = NewRequestHandler.generate_request_id()
+                    remittance_id = self.generate_remittance_id()
                 )
                 
-                db.add(request)
+                db.add(remittance)
                 db.commit()
                 
                 user = db.query(User).filter(User.user_id == context.user_data['user_id']).first()
-                # success = await SendRequest.send_request_to_channel(request, user.name)
-                success = True
+                success = await SendRequest.send_request_to_channel(remittance, user.name)
                 
                 if success:
                     await update.message.reply_text(
                         f"✅ درخواست شما با موفقیت ثبت شد:\n\n"
-                        f"📌 شماره درخواست: {request.request_id}\n"
+                        f"📌 شماره درخواست: {remittance.remittance_id}\n"
                         f"👤 نام: {user.name}\n"
                         f"💰 ارز: {context.user_data['currency']}\n"
                         f"🌍 کشور: {context.user_data['country']}\n"
@@ -361,8 +359,8 @@ class NewRequestHandler:
                 context.user_data.clear()
                 return ConversationHandler.END
 
-    @staticmethod
-    async def clean_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    async def clean_cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """لغو عملیات با پاکسازی کامل"""
         try:
             context.user_data.clear()
@@ -380,26 +378,25 @@ class NewRequestHandler:
         finally:
             return ConversationHandler.END
 
-    @staticmethod
-    def get_conversation_handler():
+
+    def get_conversation_handler(self):
         """تنظیم هندلر مکالمه برای درخواست‌های جدید"""
         return ConversationHandler(
-            entry_points=[MessageHandler(filters.Regex("^📝 ثبت درخواست جدید$"), NewRequestHandler.start_new_request)],
+            entry_points=[MessageHandler(filters.Regex("^📝 ثبت درخواست جدید$"), self.start_new_remittance)],
             states={
-                NewRequestHandler.GET_NAME_CHOICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.handle_name_choice)],
-                # NewRequestHandler.GET_NEW_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_new_name)],
-                NewRequestHandler.GET_CURRENCY: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_currency)],
-                NewRequestHandler.GET_COUNTRY: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_country)],
-                NewRequestHandler.GET_TRANSACTION_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_transaction_type)],
-                NewRequestHandler.GET_PAYMENT_METHOD: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_payment_method)],
-                NewRequestHandler.GET_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_price)],
-                NewRequestHandler.GET_ENTITY_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_entity_type)],
-                NewRequestHandler.GET_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.get_amount)],
-                NewRequestHandler.CONFIRM_REQUEST: [MessageHandler(filters.TEXT & ~filters.COMMAND, NewRequestHandler.confirm_request)],
+                self.GET_NAME_CHOICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_name_choice)],
+                self.GET_CURRENCY: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.get_currency)],
+                self.GET_COUNTRY: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.get_country)],
+                self.GET_TRANSACTION_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.get_transaction_type)],
+                self.GET_PAYMENT_METHOD: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.get_payment_method)],
+                self.GET_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.get_price)],
+                self.GET_ENTITY_TYPE: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.get_entity_type)],
+                self.GET_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.get_amount)],
+                self.CONFIRM_REQUEST: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.confirm_request)],
             },
             fallbacks=[
-                CommandHandler("cancel", NewRequestHandler.clean_cancel),
-                MessageHandler(filters.Regex(r'^(❌ انصراف|انصراف|بازگشت|بازگشت به منوی اصلی|لغو)$'), NewRequestHandler.clean_cancel),
+                CommandHandler("cancel", self.clean_cancel),
+                MessageHandler(filters.Regex(r'^(❌ انصراف|انصراف|بازگشت|بازگشت به منوی اصلی|لغو)$'), self.clean_cancel),
             ],
             allow_reentry=False
         )
@@ -418,10 +415,14 @@ class SendRequest:
         try:
             bot = Bot(token=config("TOKEN"))
             channel_id = config("CHANNEL_USERNAME")
+            print("*******************")
+            print(channel_id)
+            print("*******************")
+
 
             message = (
                 f"📋 *درخواست جدید*\n\n"
-                f"🔹 *شماره:* `{request.request_id}`\n"
+                f"🔹 *شماره:* `{request.remittance_id}`\n"
                 f"🔹 *نام:* {SendRequest.escape_markdown_v2(user_name)}\n"
                 f"🔹 *ارز:* `{request.currency}`\n"
                 f"🔹 *کشور:* `{request.country}`\n"
